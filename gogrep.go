@@ -5,8 +5,18 @@ import (
   "os"
 )
 
+func printError(e error, help bool){
+  fmt.Fprintf(os.Stderr, "%s\n", e.Error())
+  if (help){
+    printHelp()
+  }
+}
+
+func printHelp() {
+  fmt.Fprintf(os.Stderr, "Usage: gogrep <file> <pattern>\n")
+}
+
 type ArgumentsError struct {
-  Arguments []string
   Message string
 }
 
@@ -19,22 +29,28 @@ type Arguments struct {
   Pattern string
 }
 
-func printError(e error, help bool){
-  fmt.Fprintf(os.Stderr, "%s\n", e.Error())
-  if (help){
-    printHelp()
+func validateArguments(args Arguments) error {
+  fileInfo, err := os.Stat(args.Path)
+  if err != nil {
+    return err
+  } else if fileInfo.IsDir() {
+    return &ArgumentsError{"The given path is a not a regular file"}
   }
-}
-
-func printHelp() {
-  fmt.Fprintf(os.Stderr, "Usage: gogrep <file> <pattern>\n")
+  return nil
 }
 
 func processArguments(args []string) (Arguments, error) {
   if len(args) != 3 {
-    return Arguments{}, &ArgumentsError{args, "Too many or too few arguments"}
+    return Arguments{}, &ArgumentsError{"Too many or too few arguments"}
+  } 
+
+  arguments := Arguments{args[1], args[2]}
+
+  if err := validateArguments(arguments); err != nil {
+    return Arguments{}, err
   }
-  return Arguments{args[1], args[2]}, nil
+
+  return arguments, nil
 }
 
 func main() {
