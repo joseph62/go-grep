@@ -3,6 +3,8 @@ package main
 import (
   "fmt"
   "os"
+  "io/ioutil"
+  "strings"
 )
 
 func printError(e error, help bool){
@@ -42,7 +44,7 @@ func validateArguments(args Arguments) error {
 func processArguments(args []string) (Arguments, error) {
   if len(args) != 3 {
     return Arguments{}, &ArgumentsError{"Too many or too few arguments"}
-  } 
+  }
 
   arguments := Arguments{args[1], args[2]}
 
@@ -53,6 +55,14 @@ func processArguments(args []string) (Arguments, error) {
   return arguments, nil
 }
 
+func readLines(path string) ([]string, error) {
+  contents, err := ioutil.ReadFile(path)
+  if err != nil {
+    return  nil, err
+  }
+  return strings.Split(string(contents), "\n"), nil
+}
+
 func main() {
   arguments, err := processArguments(os.Args)
   if err != nil {
@@ -60,4 +70,13 @@ func main() {
     return
   }
   fmt.Printf("Path: %s, Pattern: %s\n", arguments.Path, arguments.Pattern)
+  lines, err := readLines(arguments.Path)
+  if err != nil {
+    printError(err, false)
+    return
+  }
+
+  for i := 0; i < len(lines); i++ {
+    fmt.Printf("%d %s\n", i, lines[i])
+  }
 }
