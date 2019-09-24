@@ -5,6 +5,8 @@ import (
   "os"
   "io/ioutil"
   "strings"
+  "regexp"
+  "container/list"
 )
 
 func printError(e error, help bool){
@@ -16,6 +18,11 @@ func printError(e error, help bool){
 
 func printHelp() {
   fmt.Fprintf(os.Stderr, "Usage: gogrep <file> <pattern>\n")
+}
+
+type LineMatch struct {
+  Line string
+  LineNumber uint64
 }
 
 type ArgumentsError struct {
@@ -63,20 +70,44 @@ func readLines(path string) ([]string, error) {
   return strings.Split(string(contents), "\n"), nil
 }
 
+func getMatchingLines(pattern string, lines []string) (*list.List, error) {
+  matches := list.New()
+  for i := uint64(0); i < uint64(len(lines)); i++ {
+    if matched, err := regexp.MatchString(pattern, lines[i]); err != nil {
+      return matches, err
+    } else if matched {
+      matches.PushBack(LineMatch{lines[i],i})
+    }
+  }
+  return matches, nil
+}
+
 func main() {
+
   arguments, err := processArguments(os.Args)
   if err != nil {
     printError(err, true)
     return
   }
-  fmt.Printf("Path: %s, Pattern: %s\n", arguments.Path, arguments.Pattern)
+
   lines, err := readLines(arguments.Path)
   if err != nil {
     printError(err, false)
     return
   }
 
-  for i := 0; i < len(lines); i++ {
-    fmt.Printf("%d %s\n", i, lines[i])
+  matches, err := getMatchingLines(arguments.Pattern, lines)
+  if err != nil {
+    printError(err, false)
+    return
+  }
+
+  for e := matches.Front(); e != nil; e = e.Next() {
+    match, ok := e.Value.(LineMatch)
+    if !ok {
+      printError(&ArgumentsError{"Weird type mismatch thing happened"}, false)
+      return
+    }
+    fmt.Printf("%d %s\n", match.LineNumber, match.Line)
   }
 }
