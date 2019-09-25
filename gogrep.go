@@ -6,7 +6,6 @@ import (
   "io/ioutil"
   "strings"
   "regexp"
-  "container/list"
 )
 
 func printError(e error, help bool){
@@ -70,13 +69,13 @@ func readLines(path string) ([]string, error) {
   return strings.Split(string(contents), "\n"), nil
 }
 
-func getMatchingLines(pattern string, lines []string) (*list.List, error) {
-  matches := list.New()
+func getMatchingLines(pattern string, lines []string) ([]LineMatch, error) {
+  matches := []LineMatch{}
   for i := uint64(0); i < uint64(len(lines)); i++ {
     if matched, err := regexp.MatchString(pattern, lines[i]); err != nil {
       return matches, err
     } else if matched {
-      matches.PushBack(LineMatch{lines[i],i})
+      matches = append(matches, LineMatch{lines[i], i})
     }
   }
   return matches, nil
@@ -102,12 +101,8 @@ func main() {
     return
   }
 
-  for e := matches.Front(); e != nil; e = e.Next() {
-    match, ok := e.Value.(LineMatch)
-    if !ok {
-      printError(&ArgumentsError{"Weird type mismatch thing happened"}, false)
-      return
-    }
+  for i := 0; i < len(matches); i++ {
+    match := matches[i]
     fmt.Printf("%d %s\n", match.LineNumber, match.Line)
   }
 }
