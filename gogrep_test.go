@@ -4,17 +4,61 @@ import (
 	"testing"
 )
 
+func TestIsMatch(t *testing.T) {
+  pattern, line := "^.*line.*$", "this line here"
+  if !isMatch(pattern, line) {
+    t.Errorf("Expected pattern '%s' to match line '%s', but it did not", pattern, line)
+  }
+}
+
+func TestIsMatchNoMatch(t *testing.T) {
+  pattern, line := "^.*statement.*$", "this line here"
+  if isMatch(pattern, line) {
+    t.Errorf("Expected pattern '%s' to not match line '%s', but it did", pattern, line)
+  }
+}
+
+func TestIsNotMatch(t *testing.T) {
+  pattern, line := "^.*line.*$", "this line here"
+  if isNotMatch(pattern, line) {
+    t.Errorf("Expected pattern '%s' to match line '%s', but it did not", pattern, line)
+  }
+}
+
+func TestIsNotMatchWithMatch(t *testing.T) {
+  pattern, line := "^.*statement.*$", "this line here"
+  if !isNotMatch(pattern, line) {
+    t.Errorf("Expected pattern '%s' to not match line '%s', but it did", pattern, line)
+  }
+}
+
+func TestIsMatchLines(t *testing.T){
+  pattern, lines := "^.*line.*$", []string{"one line", "two line", "three three"}
+  matches := filterLines(pattern, lines, isMatch)
+  if len(matches) != 2 {
+    t.Errorf("Expected 2 matches, but got %d", len(matches))
+  }
+}
+
+func TestIsNotMatchLines(t *testing.T){
+  pattern, lines := "^.*line.*$", []string{"one line", "two line", "three three"}
+  matches := filterLines(pattern, lines, isNotMatch)
+  if len(matches) != 1 {
+    t.Errorf("Expected 1 matches, but got %d", len(matches))
+  }
+}
+
 func TestArgumentsErrorFormatting(t *testing.T) {
 	err := ArgumentsError{"Testing"}
 	output := err.Error()
-	if output != "Error: Testing" {
-		t.Errorf("Expected 'Error: Testing', got '%s'", output)
+	if output != "Testing" {
+		t.Errorf("Expected 'Testing', got '%s'", output)
 	}
 }
 
 func TestArgumentsProcessing(t *testing.T) {
-	path, pattern := "./gogrep.go", "third"
-	arguments, err := processArguments([]string{"first", path, pattern})
+	path, pattern := "./gogrep.go", "func"
+	arguments, err := processArguments([]string{pattern, path})
 
 	if err != nil {
 		t.Errorf("Expected no error, got %s", err.Error())
@@ -27,6 +71,10 @@ func TestArgumentsProcessing(t *testing.T) {
 	if arguments.Pattern != pattern {
 		t.Errorf("Expected '%s', got %s", pattern, arguments.Pattern)
 	}
+
+  if arguments.Inverse {
+		t.Errorf("Expected Inverse to not be set, but it was set")
+  }
 }
 
 func TestGetMatchingLinesMany(t *testing.T) {
@@ -34,15 +82,11 @@ func TestGetMatchingLinesMany(t *testing.T) {
 	pattern := "line"
 	expectedLines := []string{"first line", "third line"}
 
-	matchingLines, err := getMatchingLines(pattern, lines)
+	matchingLines := getMatchingLines(pattern, lines)
 
-	if err != nil {
-		t.Errorf("Expected no error, got %s", err.Error())
-	} else {
-		if len(matchingLines) != len(expectedLines) {
-			t.Errorf("Expected %d lines, got %d", len(expectedLines), len(matchingLines))
-		}
-	}
+  if len(matchingLines) != len(expectedLines) {
+    t.Errorf("Expected %d lines, got %d", len(expectedLines), len(matchingLines))
+  }
 }
 
 func TestGetMatchingLinesNoLines(t *testing.T) {
@@ -50,14 +94,10 @@ func TestGetMatchingLinesNoLines(t *testing.T) {
 	pattern := "line"
 	expectedLines := []string{}
 
-	matchingLines, err := getMatchingLines(pattern, lines)
+	matchingLines := getMatchingLines(pattern, lines)
 
-	if err != nil {
-		t.Errorf("Expected no error, got %s", err.Error())
-	} else {
-		if len(matchingLines) != len(expectedLines) {
-			t.Errorf("Expected %d lines, got %d", len(expectedLines), len(matchingLines))
-		}
+  if len(matchingLines) != len(expectedLines) {
+    t.Errorf("Expected %d lines, got %d", len(expectedLines), len(matchingLines))
 	}
 }
 
@@ -66,15 +106,11 @@ func TestGetMatchingLinesOneLine(t *testing.T) {
 	pattern := "line"
 	expectedLines := []string{"only line"}
 
-	matchingLines, err := getMatchingLines(pattern, lines)
+	matchingLines := getMatchingLines(pattern, lines)
 
-	if err != nil {
-		t.Errorf("Expected no error, got %s", err.Error())
-	} else {
-		if len(matchingLines) != len(expectedLines) {
-			t.Errorf("Expected %d lines, got %d", len(expectedLines), len(matchingLines))
-		}
-	}
+  if len(matchingLines) != len(expectedLines) {
+    t.Errorf("Expected %d lines, got %d", len(expectedLines), len(matchingLines))
+  }
 }
 
 func TestGetMatchingLinesMatchOneLine(t *testing.T) {
@@ -82,13 +118,9 @@ func TestGetMatchingLinesMatchOneLine(t *testing.T) {
 	pattern := "red"
 	expectedLines := []string{"red line"}
 
-	matchingLines, err := getMatchingLines(pattern, lines)
+	matchingLines := getMatchingLines(pattern, lines)
 
-	if err != nil {
-		t.Errorf("Expected no error, got %s", err.Error())
-	} else {
-		if len(matchingLines) != len(expectedLines) {
-			t.Errorf("Expected %d lines, got %d", len(expectedLines), len(matchingLines))
-		}
-	}
+  if len(matchingLines) != len(expectedLines) {
+    t.Errorf("Expected %d lines, got %d", len(expectedLines), len(matchingLines))
+  }
 }

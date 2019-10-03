@@ -2,21 +2,19 @@ package main
 
 import (
 	"fmt"
+  "flag"
 	"io/ioutil"
+  "io"
 	"os"
 	"regexp"
 	"strings"
 )
 
-func printError(e error, help bool) {
-	fmt.Fprintf(os.Stderr, "%s\n", e.Error())
-	if help {
-		printHelp()
-	}
-}
-
-func printHelp() {
-	fmt.Fprintf(os.Stderr, "Usage: gogrep <file> <pattern>\n")
+func gogrepUsage(defaultUsage func(), writer io.Writer) func() {
+  return func() {
+    fmt.Fprintf(writer, "gogrep pattern path [--inverse]\n")
+    defaultUsage()
+  }
 }
 
 type LineMatch struct {
@@ -29,36 +27,34 @@ type ArgumentsError struct {
 }
 
 func (e *ArgumentsError) Error() string {
-	return fmt.Sprintf("Error: %s", e.Message)
+	return fmt.Sprintf("%s", e.Message)
 }
 
 type Arguments struct {
-	Path    string
 	Pattern string
-}
-
-func validateArguments(args Arguments) error {
-	fileInfo, err := os.Stat(args.Path)
-	if err != nil {
-		return err
-	} else if fileInfo.IsDir() {
-		return &ArgumentsError{"The given path is a not a regular file"}
-	}
-	return nil
+	Path    string
+  Inverse bool
 }
 
 func processArguments(args []string) (Arguments, error) {
-	if len(args) != 3 {
+  parser := flag.NewFlagSet("gogrep", flag.ExitOnError)
+  parser.Usage = gogrepUsage(parser.Usage, os.Stderr)
+  
+  inverse := parser.Bool("inverse", false, "Print lines that do not match the pattern")
+
+  err := parser.Parse(args)
+
+  if err != nil {
+    return Arguments{}, err
+  }
+
+  positionalArguments := parser.Args()
+
+	if len(positionalArguments) < 2 {
 		return Arguments{}, &ArgumentsError{"Too many or too few arguments"}
 	}
 
-	arguments := Arguments{args[1], args[2]}
-
-	if err := validateArguments(arguments); err != nil {
-		return Arguments{}, err
-	}
-
-	return arguments, nil
+	return Arguments{positionalArguments[0], positionalArguments[1], *inverse}, nil
 }
 
 func readLines(path string) ([]string, error) {
@@ -69,37 +65,60 @@ func readLines(path string) ([]string, error) {
 	return strings.Split(string(contents), "\n"), nil
 }
 
-func getMatchingLines(pattern string, lines []string) ([]LineMatch, error) {
-	matches := []LineMatch{}
-	for i := uint64(0); i < uint64(len(lines)); i++ {
-		if matched, err := regexp.MatchString(pattern, lines[i]); err != nil {
-			return matches, err
-		} else if matched {
-			matches = append(matches, LineMatch{lines[i], i})
-		}
-	}
-	return matches, nil
+func isMatch(pattern, line string) bool {
+  matched, err := regexp.MatchString(pattern, line)
+  return err == nil && matched
+}
+
+func isNotMatch(pattern, line string) bool {
+  return !isMatch(pattern, line)
+}
+
+func filterLines(pattern string, lines []string, predicate func(string, string) bool) []string {
+  results := []string{}
+  for i := 0; i < len(lines); i++ {
+    if predicate(pattern, lines[i]) {
+      results = append(results, lines[i])
+    }
+  }
+  return results
+}
+
+func processMatchingLines(lines []string) []LineMatch {
+  results := []LineMatch{}
+  for i := 0; i < len(lines); i++ {
+    results = append(results, LineMatch{lines[i], uint64(i)})
+  }
+  return results
+}
+
+func getNonMatchingLines(pattern string, lines []string) []LineMatch {
+  return processMatchingLines(filterLines(pattern, lines, isNotMatch))
+}
+
+func getMatchingLines(pattern string, lines []string) []LineMatch {
+  return processMatchingLines(filterLines(pattern, lines, isMatch))
 }
 
 func main() {
-
 	arguments, err := processArguments(os.Args)
 	if err != nil {
-		printError(err, true)
+    fmt.Fprintf(os.Stderr, "%s\n", err.Error())
 		return
 	}
 
 	lines, err := readLines(arguments.Path)
 	if err != nil {
-		printError(err, false)
+    fmt.Fprintf(os.Stderr, "%s\n", err.Error())
 		return
 	}
 
-	matches, err := getMatchingLines(arguments.Pattern, lines)
-	if err != nil {
-		printError(err, false)
-		return
-	}
+  var matches []LineMatch
+  if arguments.Inverse {
+    matches = getNonMatchingLines(arguments.Pattern, lines)
+  } else {
+    matches = getMatchingLines(arguments.Pattern, lines)
+  }
 
 	for i := 0; i < len(matches); i++ {
 		match := matches[i]
